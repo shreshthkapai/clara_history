@@ -65,10 +65,12 @@ class ClaraAgent:
             text=patient_message
         )
         
+        # Check red flags
         red_flag_result = self._check_red_flags(patient_message)
         if red_flag_result:
             return red_flag_result  
         
+        # Update checklist
         self._update_checklist_from_response(patient_message)
         
         should_end, end_reason = self.state.should_end_conversation()
@@ -79,9 +81,38 @@ class ClaraAgent:
                 self.state.end_conversation(status="completed")
                 return (closing_message, True, end_reason)
         
+        # Generate next question/response
         clara_response = self._generate_next_question()
         
         next_topic = self.state.get_next_priority_topic()
+        
+        if next_topic == "closing" or next_topic is None:
+            # Check if the response contains farewell phrases
+            farewell_phrases = [
+                "thank you so much for your time",
+                "take care",
+                "your responses will help",
+            "have a good day",
+            "dr. smith will be with you soon",
+            "hope your appointment goes well"
+        ]
+        
+        clara_lower = clara_response.lower()
+        if any(phrase in clara_lower for phrase in farewell_phrases):
+            # This is a farewell - mark closing complete and END
+            self.state.mark_topic_complete("closing")
+            self.state.end_conversation(status="completed")
+            
+            # Add the farewell message
+            self.state.add_message(
+                speaker="clara",
+                text=clara_response,
+                topic="closing"
+            )
+            
+            return (clara_response, True, "completed")
+        
+        # Normal flow - add message and continue
         self.state.add_message(
             speaker="clara",
             text=clara_response,
