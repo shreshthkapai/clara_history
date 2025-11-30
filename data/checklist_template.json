@@ -1,0 +1,236 @@
+{
+  "opening_message": "Hi! I'm Clara. I'll be asking you some pre-consultation questions to help get the most out of your consultation. However, I cannot provide medical advice or diagnosis.",
+  
+  "checklist": {
+    "chief_complaint": {
+      "name": "Chief Complaint / Reason for Visit",
+      "required": true,
+      "completed": false,
+      "priority": 1,
+      "questions": [
+        "What was the main reason for your consultation?",
+        "Can you tell me more about what prompted you to book this appointment?"
+      ],
+      "note": "These are example questions only - Clara generates contextual questions based on conversation"
+    },
+    "history_presenting_complaint": {
+      "name": "History of Presenting Complaint",
+      "required": true,
+      "completed": false,
+      "priority": 2,
+      "sub_items": [
+        "onset",
+        "duration",
+        "progression",
+        "location",
+        "character",
+        "severity",
+        "timing",
+        "triggers_relievers",
+        "associated_symptoms",
+        "previous_episodes",
+        "impact_daily_life"
+      ],
+      "questions": [
+        "When did this first start?",
+        "Has it been getting better, worse, or staying the same?",
+        "On a scale of 0 to 10, how severe is it?"
+      ]
+    },
+    "ice": {
+      "name": "Ideas, Concerns, Expectations",
+      "required": true,
+      "completed": false,
+      "priority": 3,
+      "questions": [
+        "What do you think might be causing this?",
+        "Is there anything in particular that worries you?",
+        "What were you hoping the doctor could do for you?"
+      ]
+    },
+    "red_flags": {
+      "name": "Red Flag Screening",
+      "required": true,
+      "completed": false,
+      "priority": 4,
+      "red_flag_categories": {
+        "cardiac_chest_pain": {
+          "triggers": [
+            "crushing chest pain",
+            "chest pain radiating to arm",
+            "chest pain radiating to jaw",
+            "chest pain with severe breathlessness",
+            "chest pain with sweating and nausea"
+          ],
+          "severity": "critical",
+          "response_template": "medical_emergency_cardiac"
+        },
+        "severe_breathlessness": {
+          "triggers": [
+            "can't complete sentences",
+            "gasping for air",
+            "blue lips or fingers",
+            "severe difficulty breathing",
+            "can't breathe at all"
+          ],
+          "severity": "critical",
+          "response_template": "medical_emergency_respiratory"
+        },
+        "acute_neuro": {
+          "triggers": [
+            "sudden weakness one side",
+            "facial drooping",
+            "slurred speech suddenly",
+            "can't move arm suddenly",
+            "can't move leg suddenly",
+            "sudden severe headache worst of life",
+            "loss of consciousness",
+            "having a seizure"
+          ],
+          "severity": "critical",
+          "response_template": "medical_emergency_stroke"
+        },
+        "mental_health_risk": {
+          "triggers": [
+            "suicidal thoughts",
+            "want to kill myself",
+            "planning to harm myself",
+            "thoughts of harming others",
+            "feeling life isn't worth living"
+          ],
+          "severity": "critical",
+          "response_template": "mental_health_crisis"
+        }
+      },
+      "questions": [
+        "Have you had any chest pain, severe shortness of breath, or sudden weakness?",
+        "Any thoughts of harming yourself or that life isn't worth living?"
+      ]
+    },
+    "past_medical_history": {
+      "name": "Past Medical History",
+      "required": true,
+      "completed": false,
+      "priority": 5,
+      "questions": [
+        "Do you have any long-term health conditions like high blood pressure, diabetes, or asthma?",
+        "Have you had any surgeries or hospital admissions?",
+        "Have you had similar problems before?"
+      ]
+    },
+    "medications": {
+      "name": "Medications & Allergies",
+      "required": true,
+      "completed": false,
+      "priority": 6,
+      "questions": [
+        "What medications do you currently take, including over-the-counter or supplements?",
+        "Have there been any recent changes to your medications?",
+        "Do you have any allergies to medications? If yes, what happens when you take them?"
+      ]
+    },
+    "family_history": {
+      "name": "Family History",
+      "required": false,
+      "completed": false,
+      "priority": 7,
+      "questions": [
+        "Does anyone in your family have heart disease, diabetes, cancer, or other serious conditions?"
+      ]
+    },
+    "social_history": {
+      "name": "Social History",
+      "required": true,
+      "completed": false,
+      "priority": 8,
+      "questions": [
+        "Do you smoke or vape?",
+        "How much alcohol do you drink in a typical week?",
+        "What kind of work do you do?",
+        "Who do you live with, and do you have support at home?"
+      ]
+    },
+    "systems_review": {
+      "name": "Systems Review (Targeted)",
+      "required": false,
+      "completed": false,
+      "priority": 9,
+      "categories": [
+        "general",
+        "cardiovascular_respiratory",
+        "gastrointestinal_genitourinary",
+        "neurological",
+        "musculoskeletal",
+        "skin",
+        "mental_health"
+      ],
+      "note": "Only ask about systems relevant to presenting complaint"
+    },
+    "gynae_sexual": {
+      "name": "Gynaecological / Sexual History",
+      "required": false,
+      "completed": false,
+      "priority": 10,
+      "questions": [
+        "When clearly relevant to presenting problem"
+      ],
+      "note": "Only when relevant - e.g. perimenopause symptoms, pelvic pain, etc."
+    },
+    "closing": {
+      "name": "Closing & Confirmation",
+      "required": true,
+      "completed": false,
+      "priority": 11,
+      "questions": [
+        "Is there anything important you feel we haven't covered?",
+        "Is there anything else you'd like the doctor to know?"
+      ]
+    }
+  },
+  
+  "red_flag_responses": {
+    "mental_health_crisis": {
+      "helplines": {
+        "Samaritans": "116 123 (free, 24/7)",
+        "Crisis Text Line": "Text SHOUT to 85258",
+        "NHS Mental Health Crisis": "Call 111, select option 2"
+      },
+      "message": "I'm very concerned about what you've shared. Your safety is the most important thing right now.\n\nPlease reach out for immediate support:\n- Samaritans: 116 123 (free, 24/7)\n- Crisis Text Line: Text SHOUT to 85258\n- NHS Mental Health Crisis: Call 111 and select option 2\n\nWill you contact one of these services right now?"
+    },
+    "medical_emergency_cardiac": {
+      "helplines": {
+        "Emergency": "999"
+      },
+      "message": "The chest pain you're describing sounds like it could be a heart attack. This is life-threatening.\n\nPlease call 999 immediately.\n\nAre you able to call 999 right now?"
+    },
+    "medical_emergency_respiratory": {
+      "helplines": {
+        "Emergency": "999"
+      },
+      "message": "Severe breathing difficulties are a medical emergency.\n\nPlease call 999 now.\n\nCan you call 999 right now?"
+    },
+    "medical_emergency_stroke": {
+      "helplines": {
+        "Emergency": "999"
+      },
+      "message": "The symptoms you're describing could be a stroke. Every minute counts.\n\nPlease call 999 immediately.\n\nCan you call 999 right now?"
+    },
+    "continue_after_decline": {
+      "message": "I understand, but I want to emphasize that what you've described is a medical emergency. Please seek help as soon as possible, even if you continue this conversation.\n\nThis will be clearly flagged as urgent for your doctor.\n\nShall we continue with the questions?"
+    },
+    "end_after_accept": {
+      "message": "Thank you for agreeing to get help - that's the right decision. I'm ending our conversation now so you can call for emergency assistance immediately.\n\nYour responses so far have been saved for your doctor.\n\nPlease call for help right away."
+    }
+  },
+  
+  "conversation_rules": {
+    "max_questions": 20,
+    "min_required_topics": 7,
+    "adaptive_questioning": true,
+    "red_flag_priority": "immediate",
+    "red_flag_action": "interrupt_and_respond",
+    "follow_up_depth": "based_on_response",
+    "empathy_required": true,
+    "no_medical_advice": true
+  }
+}
