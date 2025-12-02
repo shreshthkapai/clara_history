@@ -64,6 +64,8 @@ class ClaraAgent:
             speaker="patient",
             text=patient_message
         )
+        # Ensure farewell_phrases is always defined (avoids UnboundLocalError)
+        farewell_phrases: List[str] = []
         
         # Check red flags
         red_flag_result = self._check_red_flags(patient_message)
