@@ -77,18 +77,20 @@
           "response_template": "medical_emergency_respiratory"
         },
         "acute_neuro": {
-          "triggers": [
-            "sudden weakness one side",
-            "facial drooping",
-            "slurred speech suddenly",
-            "can't move arm suddenly",
-            "can't move leg suddenly",
-            "sudden severe headache worst of life",
-            "loss of consciousness",
-            "having a seizure"
-          ],
-          "severity": "critical",
-          "response_template": "medical_emergency_stroke"
+  "triggers": [
+    "sudden weakness one side",
+    "facial drooping",
+    "slurred speech suddenly",
+    "can't move arm suddenly",
+    "can't move leg suddenly",
+    "thunderclap headache",              
+    "headache reaching peak pain instantly", 
+    "loss of consciousness",
+    "having a seizure"
+  ],
+  "severity": "critical",
+  "response_template": "medical_emergency_stroke"
+
         },
         "mental_health_risk": {
           "triggers": [
