@@ -64,15 +64,11 @@ class ClaraAgent:
             speaker="patient",
             text=patient_message
         )
-        # Ensure farewell_phrases is always defined (avoids UnboundLocalError)
-        farewell_phrases: List[str] = []
         
-        # Check red flags
         red_flag_result = self._check_red_flags(patient_message)
         if red_flag_result:
             return red_flag_result  
         
-        # Update checklist
         self._update_checklist_from_response(patient_message)
         
         should_end, end_reason = self.state.should_end_conversation()
@@ -83,38 +79,9 @@ class ClaraAgent:
                 self.state.end_conversation(status="completed")
                 return (closing_message, True, end_reason)
         
-        # Generate next question/response
         clara_response = self._generate_next_question()
         
         next_topic = self.state.get_next_priority_topic()
-        
-        if next_topic == "closing" or next_topic is None:
-            # Check if the response contains farewell phrases
-            farewell_phrases = [
-                "thank you so much for your time",
-                "take care",
-                "your responses will help",
-            "have a good day",
-            "dr. smith will be with you soon",
-            "hope your appointment goes well"
-        ]
-        
-        clara_lower = clara_response.lower()
-        if any(phrase in clara_lower for phrase in farewell_phrases):
-            # This is a farewell - mark closing complete and END
-            self.state.mark_topic_complete("closing")
-            self.state.end_conversation(status="completed")
-            
-            # Add the farewell message
-            self.state.add_message(
-                speaker="clara",
-                text=clara_response,
-                topic="closing"
-            )
-            
-            return (clara_response, True, "completed")
-        
-        # Normal flow - add message and continue
         self.state.add_message(
             speaker="clara",
             text=clara_response,
@@ -261,23 +228,10 @@ class ClaraAgent:
     def _build_system_prompt(self, next_topic: str, topic_name: str, example_questions: List[str]) -> str:
         """Build the system prompt for generating next question"""
         
+        # Get progress
         progress = self.state.get_progress_summary()
+        incomplete_topics = self.state.get_incomplete_required_topics()
         
-        # Special handling for closing topic
-        if next_topic == "closing":
-            return f"""You are Clara, wrapping up the pre-consultation interview with {self.patient_name}.
-
-CRITICAL CLOSING RULES:
-1. Ask ONE final question: "Is there anything else important you'd like the doctor to know?"
-2. If the patient says NO/NOTHING/THAT'S ALL → Respond with ONLY: "Thank you so much for your time, {self.patient_name}. Your responses will help {self.doctor_name} provide you with the best care. Take care!"
-3. DO NOT ask follow-up questions after they say no
-4. DO NOT say "let me know if you think of anything else"
-5. DO NOT prolong the conversation
-
-You have asked {progress['questions_asked']} questions. This should be the FINAL exchange.
-Generate your closing question or final farewell now."""
-        
-        # Regular system prompt for other topics
         system_prompt = f"""You are Clara, a medical history-taking assistant conducting a pre-consultation interview with {self.patient_name} before their appointment with {self.doctor_name}.
 
 YOUR ROLE - READ CAREFULLY:
@@ -292,24 +246,18 @@ CRITICAL RULES:
 5. DO NOT ask follow-up questions about topics already thoroughly covered
 6. DO NOT ask about medications or past medical history unless that's the current topic
 7. Stay focused on ONE topic at a time - don't jump around
-8. **ASK ONLY ONE QUESTION AT A TIME** - Never list multiple questions
 
 WHAT YOU SHOULD DO:
 - Ask ONE clear, direct question at a time
 - Acknowledge what they said briefly ("Thank you for sharing that")
 
-Current topic: {topic_name}
+Example of GOOD question:
+"When did the stomach pain first start?"
 
-Example of GOOD response:
-"Thank you for sharing that. When did the stomach pain first start?"
+Example of BAD question (DO NOT DO THIS):
+"I'm concerned about your stomach pain - have you thought about whether your cholesterol medication might be affecting your digestion?"
 
-Example of BAD response (DO NOT DO THIS):
-"Thank you for sharing. Here are my questions:
-1. When did it start?
-2. How severe is it?
-3. What makes it worse?"
-
-Generate your ONE question now about {topic_name}."""
+Generate your question now - ONE focused question about {topic_name}."""
         
         return system_prompt
     
