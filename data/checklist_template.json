@@ -226,7 +226,7 @@
   },
   
   "conversation_rules": {
-    "max_questions": 20,
+    "max_questions": 30,
     "min_required_topics": 7,
     "adaptive_questioning": true,
     "red_flag_priority": "immediate",

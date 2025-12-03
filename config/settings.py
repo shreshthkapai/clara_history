@@ -12,7 +12,7 @@ class Settings:
     AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
     AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")
 
-    MAX_QUESTIONS = int(os.getenv("MAX_QUESTIONS", 20))
+    MAX_QUESTIONS = int(os.getenv("MAX_QUESTIONS", 30))
     CONVERSATION_TIMEOUT_MINUTES = int(os.getenv("CONVERSATION_TIMEOUT_MINUTES", 15))
 
     @classmethod
