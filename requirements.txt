@@ -1,5 +1,32 @@
+# --- Main dependencies ---
 streamlit==1.31.0
 openai==1.12.0
 azure-cognitiveservices-speech==1.35.0
 python-dotenv==1.0.0
 pydantic==2.6.1
+
+# --- Streamlit core dependencies (auto-installed but required for deployments) ---
+altair==5.2.0
+blinker==1.7.0
+cachetools==5.3.2
+click==8.1.7
+gitpython==3.1.41
+protobuf==4.25.2
+pyarrow==14.0.1
+pillow==10.2.0
+requests==2.31.0
+rich==13.7.0
+toml==0.10.2
+typing-extensions==4.9.0
+
+# --- OpenAI SDK dependencies ---
+httpx==0.26.0
+anyio==4.2.0
+
+# --- Azure Speech dependencies ---
+cffi==1.16.0
+pycparser==2.21
+
+# --- Utility dependencies ---
+numpy==1.26.4
+pandas==2.2.0
