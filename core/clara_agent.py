@@ -242,25 +242,27 @@ class ClaraAgent:
             done_phrases = [
                 "no", "nope", "nothing", "that's all", "that's everything",
                 "no thanks", "i think that's it", "nothing else", "all good",
-                "that covers it", "i'm good", "we're good", "nothing more"
+                "that covers it", "i'm good", "we're good", "nothing more",
+                "that's it", "nah", "not really"
             ]
 
             # If response is short AND contains done phrase, mark complete
             word_count = len(patient_message.split())
             is_done = any(phrase in response_lower for phrase in done_phrases)
 
-            if is_done and word_count < 10:
+            if is_done and word_count < 15:
                 # They're done - mark closing complete
                 self.state.mark_topic_complete("closing")
-            else:
-                # They added new info - DON'T mark complete yet
-                # Clara will ask follow-ups, then ask closing again
-                pass
+                return
 
-            return
+            # Also check if it's just a SHORT response (patient being brief)
+            if word_count <= 5:
+                # Very short response to closing = probably done
+                self.state.mark_topic_complete("closing")
+                return
 
         # For other topics: if patient gave substantial response, mark complete
-        if len(patient_message.strip().split()) > 3:  # More than 3 words
+        if len(patient_message.strip().split()) > 3:
             self.state.mark_topic_complete(last_topic)
 
     def _generate_next_question(self) -> str:
