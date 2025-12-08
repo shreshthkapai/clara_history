@@ -1,6 +1,8 @@
 from openai import AzureOpenAI
 from typing import List, Dict, Optional
 from config.settings import settings
+import json
+
 
 class AzureOpenAIService:
     
@@ -19,7 +21,9 @@ class AzureOpenAIService:
         temperature: float = 0.7,
         max_tokens: int = 500
     ) -> str:
-
+        """
+        Standard LLM call - returns text response
+        """
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(conversation_history)
         
@@ -36,12 +40,152 @@ class AzureOpenAIService:
         except Exception as e:
             print(f"❌ Error calling Azure OpenAI: {e}")
             return "I apologize, but I'm having trouble processing your response. Could you please try again?"
+
+    def get_clara_decision_json(
+        self,
+        conversation_history: List[Dict[str, str]],
+        system_prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 500
+    ) -> Dict:
+        """
+        Smart LLM call - returns structured JSON decision
+        
+        Handles:
+        - Red flag detection
+        - Next question generation
+        - Topic completion
+        - Conversation end detection
+        - Optional topic relevance
+        
+        Returns dictionary with decision data
+        """
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(conversation_history)
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=self.deployment_name,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"}  # Force JSON output
+            )
+            
+            result_text = response.choices[0].message.content.strip()
+            
+            # Parse JSON
+            try:
+                decision = json.loads(result_text)
+            except json.JSONDecodeError as e:
+                print(f"⚠️ JSON parsing error: {e}")
+                print(f"Raw response: {result_text}")
+                
+                # Fallback - extract what we can
+                decision = self._parse_fallback_response(result_text)
+            
+            # Validate and set defaults
+            decision = self._validate_decision(decision)
+            
+            return decision
+        
+        except Exception as e:
+            print(f"❌ Error calling Azure OpenAI: {e}")
+            
+            # Emergency fallback
+            return {
+                "red_flag_detected": False,
+                "red_flag_category": None,
+                "conversation_complete": False,
+                "topics_completed": [],
+                "optional_topics_to_skip": [],
+                "current_topic": "closing",
+                "next_question": "Is there anything else you'd like to share?"
+            }
+
+    def _parse_fallback_response(self, text: str) -> Dict:
+        """
+        Fallback parser if JSON parsing fails
+        Extracts key information from malformed response
+        """
+        decision = {
+            "red_flag_detected": False,
+            "red_flag_category": None,
+            "conversation_complete": False,
+            "topics_completed": [],
+            "optional_topics_to_skip": [],
+            "current_topic": "closing",
+            "next_question": "Could you tell me more?"
+        }
+        
+        # Try to extract question from text
+        if "next_question" in text.lower():
+            try:
+                # Look for common patterns
+                import re
+                question_match = re.search(r'"next_question":\s*"([^"]+)"', text)
+                if question_match:
+                    decision["next_question"] = question_match.group(1)
+            except:
+                pass
+        else:
+            # Use the whole text as question if it looks like a question
+            if "?" in text:
+                decision["next_question"] = text
+        
+        # Check for red flag indicators
+        if "red_flag" in text.lower() and "true" in text.lower():
+            decision["red_flag_detected"] = True
+        
+        return decision
+
+    def _validate_decision(self, decision: Dict) -> Dict:
+        """
+        Validate decision has all required fields with correct types
+        """
+        defaults = {
+            "red_flag_detected": False,
+            "red_flag_category": None,
+            "conversation_complete": False,
+            "topics_completed": [],
+            "optional_topics_to_skip": [],
+            "current_topic": "closing",
+            "next_question": "Is there anything else?"
+        }
+        
+        # Ensure all fields exist
+        for key, default_value in defaults.items():
+            if key not in decision:
+                decision[key] = default_value
+        
+        # Type validation
+        if not isinstance(decision["red_flag_detected"], bool):
+            decision["red_flag_detected"] = False
+        
+        if not isinstance(decision["conversation_complete"], bool):
+            decision["conversation_complete"] = False
+        
+        if not isinstance(decision["topics_completed"], list):
+            decision["topics_completed"] = []
+        
+        if not isinstance(decision["optional_topics_to_skip"], list):
+            decision["optional_topics_to_skip"] = []
+        
+        if not isinstance(decision["next_question"], str):
+            decision["next_question"] = "Could you tell me more?"
+        
+        return decision
+
+    # ==========================================
+    # LEGACY METHODS - Keep for summaries
+    # ==========================================
         
     def generate_summary(
         self,
         transcript: List[Dict[str, str]],
         summary_type: str = "short"
     ) -> str:
+        """Generate summary from transcript (used by summary_generator.py)"""
         
         transcript_text = "\n".join([
             f"{msg['speaker'].upper()}: {msg['text']}"
@@ -76,7 +220,7 @@ class AzureOpenAIService:
             response = self.client.chat.completions.create(
                 model=self.deployment_name,
                 messages=messages,
-                temperature=0.3,  # Lower temperature for more factual summaries
+                temperature=0.3,
                 max_tokens=800
             )
             
@@ -85,109 +229,12 @@ class AzureOpenAIService:
         except Exception as e:
             print(f"❌ Error generating summary: {e}")
             return "Error generating summary."
-        
-    def detect_red_flags(
-        self,
-        patient_message: str,
-        red_flag_categories: Dict[str, Dict]
-    ) -> Optional[Dict[str, str]]:
-    
-        red_flag_list = []
-        for category, details in red_flag_categories.items():
-            triggers = details.get('triggers', [])
-            severity = details.get('severity', 'unknown')
-            red_flag_list.append(f"- {category} ({severity}): {', '.join(triggers)}")
-        
-        red_flag_text = "\n".join(red_flag_list)
 
-        system_prompt = f"""You are a medical safety assistant. Analyze patient statements for emergency red flags.
-                            RED FLAG CATEGORIES TO CHECK: {red_flag_text}
-
-                            If the patient's message contains ANY of these red flag symptoms, respond with:
-                            RED_FLAG_DETECTED: [category_name]
-
-                            If no red flags are present, respond with: NO_RED_FLAG
-                            Be cautious - if unsure, err on the side of flagging for safety."""
-                    
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Patient said: \"{patient_message}\""}
-        ]
-        
-        try:
-            response = self.client.chat.completions.create(
-                model=self.deployment_name,
-                messages=messages,
-                temperature=0.2,  # Very low - we want consistent detection
-                max_tokens=100
-            )
-            
-            result = response.choices[0].message.content.strip()
-            
-            if result.startswith("RED_FLAG_DETECTED:"):
-                category = result.split(":")[1].strip()
-                if category in red_flag_categories:
-                    return {
-                        "category": category,
-                        "severity": red_flag_categories[category].get('severity', 'unknown')
-                    }
-            
-            return None
-        
-        except Exception as e:
-            print(f"❌ Error detecting red flags: {e}")
-            return None
-
-    def detect_relevant_topics(
-        self,
-        patient_message: str,
-        optional_topics: List[str]
-    ) -> Optional[str]:
-        
-        if not optional_topics:
-            return None
-            
-        topics_str = ", ".join(optional_topics)
-        
-        system_prompt = f"""You are a medical conversation analyst. 
-                            Analyze the patient's message and decide if we MUST ask about any of these specific topics: [{topics_str}].
-                            
-                            Rules:
-                            1. Only return a topic if the patient explicitly mentions something relevant to it.
-                            2. Example: "My dad had heart issues" -> Return "family_history"
-                            3. Example: "I smoke 20 a day" -> Return "social_history"
-                            4. If nothing is relevant, return "NONE".
-                            5. Return ONLY the exact topic name from the list.
-                            """
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Patient said: \"{patient_message}\""}
-        ]
-        
-        try:
-            response = self.client.chat.completions.create(
-                model=self.deployment_name,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=50
-            )
-            
-            result = response.choices[0].message.content.strip()
-            
-            if result in optional_topics:
-                return result
-            
-            return None
-            
-        except Exception as e:
-            print(f"❌ Error detecting topics: {e}")
-            return None
-        
     def generate_prep_items(
         self,
         transcript: List[Dict[str, str]]
     ) -> List[str]:
+        """Generate preparation items for GP (used by summary_generator.py)"""
         
         transcript_text = "\n".join([
             f"{msg['speaker'].upper()}: {msg['text']}"
@@ -228,6 +275,7 @@ class AzureOpenAIService:
         self,
         transcript: List[Dict[str, str]]
     ) -> List[Dict[str, str]]:
+        """Generate probable conditions (used by summary_generator.py)"""
         
         transcript_text = "\n".join([
             f"{msg['speaker'].upper()}: {msg['text']}"

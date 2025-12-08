@@ -35,7 +35,6 @@ class ClaraAgent:
             return json.load(f)
 
     def start_conversation(self) -> str:
-
         self.conversation_started = True
 
         opening_message = self.checklist_template.get(
@@ -56,25 +55,24 @@ class ClaraAgent:
         return full_opening
 
     def process_patient_response(self, patient_message: str) -> Tuple[str, bool, Optional[str]]:
-
         self.state.add_message(
             speaker="patient",
             text=patient_message
         )
 
-        # Check red flags
-        red_flag_result = self._check_red_flags(patient_message)
-        if red_flag_result:
-            return red_flag_result
+        decision = self._get_clara_decision()
 
-        # Update checklist
-        self._update_checklist_from_response(patient_message)
+        if decision.get('red_flag_detected', False):
+            return self._handle_red_flag_detected(decision)
 
-        # Check if we should end BEFORE generating next question
-        should_end, end_reason = self.state.should_end_conversation()
+        for topic in decision.get('topics_completed', []):
+            self.state.mark_topic_complete(topic)
 
-        if should_end:
-            # Generate farewell and END
+        for topic in decision.get('optional_topics_to_skip', []):
+            if topic in self.state.topics_optional:
+                self.state.mark_topic_complete(topic)
+
+        if decision.get('conversation_complete', False):
             closing_message = self._generate_closing_message()
             self.state.add_message(
                 speaker="clara",
@@ -84,86 +82,130 @@ class ClaraAgent:
             self.state.end_conversation(status="completed")
             return (closing_message, True, "completed")
 
-        # Generate next question
-        clara_response = self._generate_next_question()
-        next_topic = self.state.get_next_priority_topic()
+        if self.state.question_count >= self.state.max_questions:
+            closing_message = self._generate_closing_message()
+            self.state.add_message(
+                speaker="clara",
+                text=closing_message,
+                topic="closing"
+            )
+            self.state.end_conversation(status="completed")
+            return (closing_message, True, "max_questions")
 
-        # CRITICAL: Detect if Clara generated a farewell message prematurely
-        # If she did, mark closing complete and END next turn
-        if next_topic == "closing" or next_topic is None:
-            # Check if response contains farewell phrases
-            farewell_indicators = [
-                "you're all set",
-                "you're good to go",
-                "that's all for now",
-                "we're all done",
-                "that covers everything",
-                "i'll make sure dr",
-                "see you at your appointment",
-                "dr. smith will see you soon"
-            ]
+        next_question = decision.get('next_question', "Is there anything else you'd like to share?")
+        current_topic = decision.get('current_topic', 'closing')
 
-            response_lower = clara_response.lower()
-            contains_farewell = any(indicator in response_lower for indicator in farewell_indicators)
-
-            if contains_farewell:
-                # This is a farewell - mark closing complete NOW
-                self.state.mark_topic_complete("closing")
-
-                # Add the message
-                self.state.add_message(
-                    speaker="clara",
-                    text=clara_response,
-                    topic="closing"
-                )
-
-                # END immediately - don't wait for patient response
-                self.state.end_conversation(status="completed")
-                return (clara_response, True, "completed")
-
-        # Normal flow - add message and continue
         self.state.add_message(
             speaker="clara",
-            text=clara_response,
-            topic=next_topic
+            text=next_question,
+            topic=current_topic
         )
 
-        return (clara_response, False, None)
+        return (next_question, False, None)
 
-    def _check_red_flags(self, patient_message: str) -> Optional[Tuple[str, bool, str]]:
+    def _get_clara_decision(self) -> Dict:
+        system_prompt = self._build_smart_system_prompt()
+        conversation_history = self._build_conversation_history()
+        decision = self.openai_service.get_clara_decision_json(
+            conversation_history=conversation_history,
+            system_prompt=system_prompt,
+            temperature=0.7,
+            max_tokens=500
+        )
+        return decision
+
+    def _build_smart_system_prompt(self) -> str:
+        required_topics = [
+            topic for topic in self.state.topics_required 
+            if not self.state.is_topic_complete(topic)
+        ]
+
+        optional_topics = [
+            topic for topic in self.state.topics_optional
+            if not self.state.is_topic_complete(topic)
+        ]
 
         red_flag_categories = self.checklist_template['checklist']['red_flags']['red_flag_categories']
+        red_flag_list = []
+        for category, details in red_flag_categories.items():
+            triggers = details.get('triggers', [])
+            red_flag_list.append(f"  - {category}: {', '.join(triggers[:3])}")
+        red_flag_text = "\n".join(red_flag_list)
 
-        detected = self.openai_service.detect_red_flags(patient_message, red_flag_categories)
+        progress = self.state.get_progress_summary()
 
-        if not detected:
-            return None
+        system_prompt = f"""You are Clara, a medical history-taking assistant for {self.patient_name} before their appointment with {self.doctor_name}.
 
-        category = detected['category']
-        severity = detected['severity']
+YOUR ROLE:
+- You are NOT a doctor. You collect medical history systematically.
+- NEVER give medical advice, diagnosis, reassurance, or treatment suggestions.
+- NEVER comment on symptom severity ("that sounds serious" / "that's reassuring").
+- Ask ONE clear, focused question at a time.
 
-        response_template_name = red_flag_categories[category].get('response_template', 'medical_emergency_cardiac')
+RESPOND WITH JSON ONLY:
+{{
+  "red_flag_detected": boolean,
+  "red_flag_category": "category_name" or null,
+  "conversation_complete": boolean,
+  "topics_completed": ["topic1", "topic2"],
+  "optional_topics_to_skip": ["topic1"],
+  "current_topic": "topic_name",
+  "next_question": "Your question here"
+}}
+
+RED FLAGS (set red_flag_detected=true if ANY detected):
+{red_flag_text}
+
+REQUIRED TOPICS (must complete all):
+{json.dumps(required_topics)}
+
+OPTIONAL TOPICS (only ask if relevant):
+{json.dumps(optional_topics)}
+- family_history: Only if patient mentions family conditions
+- systems_review: Only if symptoms suggest multi-system issues
+- gynae_sexual: Only if clearly relevant (pelvic pain, menopause, etc.)
+
+CONVERSATION COMPLETE when:
+- All required topics covered AND
+- Patient said "no"/"nothing"/"that's all" to closing question
+
+TOPIC COMPLETION:
+- Mark topics in "topics_completed" when patient has given sufficient information
+- Mark irrelevant optional topics in "optional_topics_to_skip"
+
+PROGRESS:
+- Questions: {progress['questions_asked']}/{progress['max_questions']}
+- Required topics done: {progress['required_topics_completed']}/{progress['required_topics_total']}
+- Topics completed: {self.state.topics_completed}
+
+PACING:
+{"- URGENT: Approaching question limit. Wrap up quickly. Focus only on critical missing info." if progress['questions_asked'] >= 25 else ""}
+{"- Prioritize essential topics only. Be concise." if progress['questions_asked'] >= 20 else ""}
+
+Generate your JSON response now."""
+
+        return system_prompt
+
+    def _handle_red_flag_detected(self, decision: Dict) -> Tuple[str, bool, Optional[str]]:
+        category = decision.get('red_flag_category', 'unknown')
+        red_flag_categories = self.checklist_template['checklist']['red_flags']['red_flag_categories']
+        response_template_name = red_flag_categories.get(category, {}).get('response_template', 'medical_emergency_cardiac')
         response_data = self.checklist_template['red_flag_responses'].get(response_template_name, {})
-
         emergency_message = response_data.get('message', 'Please seek urgent medical attention.')
-
         self.state.record_red_flag(
             category=category,
-            severity=severity,
+            severity=red_flag_categories.get(category, {}).get('severity', 'critical'),
             action_taken="awaiting_response"
         )
-
         self.state.add_message(
             speaker="clara",
             text=emergency_message,
             topic="red_flag_response",
-            flags=["red_flag", category, severity]
+            flags=["red_flag", category]
         )
-
         return (emergency_message, False, None)
 
     def handle_red_flag_response(self, patient_response: str) -> Tuple[str, bool, str]:
-
         self.state.add_message(
             speaker="patient",
             text=patient_response,
@@ -209,8 +251,10 @@ class ClaraAgent:
                 flags=["red_flag_continue"]
             )
 
-            next_question = self._generate_next_question()
-            next_topic = self.state.get_next_priority_topic()
+            decision = self._get_clara_decision()
+            next_question = decision.get('next_question', 'Shall we continue?')
+            next_topic = decision.get('current_topic', 'closing')
+
             self.state.add_message(
                 speaker="clara",
                 text=next_question,
@@ -221,136 +265,8 @@ class ClaraAgent:
 
             return (full_response, False, None)
 
-    def _update_checklist_from_response(self, patient_message: str):
-        """Mark topics complete intelligently"""
-
-        clara_messages = [msg for msg in self.state.messages if msg.speaker == "clara"]
-        if not clara_messages:
-            return
-
-        last_topic = clara_messages[-1].topic
-
-        if not last_topic or last_topic not in self.state.checklist:
-            return
-
-        # SPECIAL: Closing topic needs smart detection
-        if last_topic == "closing":
-            # Check if patient is saying "no/nothing" vs adding new info
-            response_lower = patient_message.lower().strip()
-
-            # Negative responses = they're done
-            done_phrases = [
-                "no", "nope", "nothing", "that's all", "that's everything",
-                "no thanks", "i think that's it", "nothing else", "all good",
-                "that covers it", "i'm good", "we're good", "nothing more",
-                "that's it", "nah", "not really"
-            ]
-
-            # If response is short AND contains done phrase, mark complete
-            word_count = len(patient_message.split())
-            is_done = any(phrase in response_lower for phrase in done_phrases)
-
-            if is_done and word_count < 15:
-                # They're done - mark closing complete
-                self.state.mark_topic_complete("closing")
-                return
-
-            # Also check if it's just a SHORT response (patient being brief)
-            if word_count <= 5:
-                # Very short response to closing = probably done
-                self.state.mark_topic_complete("closing")
-                return
-
-        # For other topics: if patient gave substantial response, mark complete
-        if len(patient_message.strip().split()) > 3:
-            self.state.mark_topic_complete(last_topic)
-
-    def _generate_next_question(self) -> str:
-        next_topic = self.state.get_next_priority_topic()
-
-        if not next_topic:
-            next_topic = "closing"
-
-        topic_details = self.state.checklist.get(next_topic, {})
-        topic_name = topic_details.get('name', next_topic)
-        example_questions = topic_details.get('questions', [])
-
-        system_prompt = self._build_system_prompt(next_topic, topic_name, example_questions)
-
-        conversation_history = self._build_conversation_history()
-
-        clara_response = self.openai_service.get_clara_response(
-            conversation_history=conversation_history,
-            system_prompt=system_prompt,
-            temperature=0.7,
-            max_tokens=300
-        )
-
-        return clara_response
-
-    def _build_system_prompt(self, next_topic: str, topic_name: str, example_questions: List[str]) -> str:
-        """Build the system prompt for generating next question"""
-
-        # Get progress
-        progress = self.state.get_progress_summary()
-        incomplete_topics = self.state.get_incomplete_required_topics()
-
-        system_prompt = f"""You are Clara, a medical history-taking assistant conducting a pre-consultation interview with {self.patient_name} before their appointment with {self.doctor_name}.
-
-YOUR ROLE - READ CAREFULLY:
-You are NOT a doctor. You are a medical history assistant collecting information systematically.
-Your ONLY job is to ask clear, focused questions to gather medical history.
-
-CRITICAL RULES:
-1. NEVER provide medical advice, reassurance, diagnosis, or treatment suggestions
-2. NEVER comment on whether symptoms are serious or not serious
-3. NEVER suggest what might be causing their symptoms
-4. NEVER say things like "that sounds concerning" or "that's reassuring"
-5. DO NOT ask follow-up questions about topics already thoroughly covered
-6. DO NOT ask about medications or past medical history unless that's the current topic
-7. Stay focused on ONE topic at a time - don't jump around
-
-WHAT YOU SHOULD DO:
-- Ask ONE clear, direct question at a time
-- Acknowledge what they said briefly ("Thank you for sharing that")
-
-Example of GOOD question:
-"When did the stomach pain first start?"
-
-Example of BAD question (DO NOT DO THIS):
-"I'm concerned about your stomach pain - have you thought about whether your cholesterol medication might be affecting your digestion?"
-
-Generate your question now - ONE focused question about {topic_name}."""
-
-        return system_prompt
-
-    def _get_pacing_instructions(self, questions_asked: int, max_questions: int) -> str:
-        remaining = max_questions - questions_asked
-
-        if remaining <= 2:
-            return """
-URGENT - PACING WARNING:
-You are about to reach the maximum question limit.
-- Do NOT start any new major topics.
-- Wrap up the current topic quickly.
-- If you have critical missing information, ask ONE final combined question.
-- Prepare to end the conversation naturally in the next turn.
-"""
-        elif remaining <= 5:
-            return f"""
-PACING WARNING:
-You have {remaining} questions remaining before the limit.
-- Prioritize only the most critical missing information.
-- Be more concise.
-- Combine related questions if possible.
-- Start moving towards a natural conclusion.
-"""
-        return ""
-
     def _build_conversation_history(self) -> List[Dict[str, str]]:
-
-        recent_messages = self.state.messages[-20:]
-
+        recent_messages = self.state.messages[-30:]
         history = []
         for msg in recent_messages:
             role = "assistant" if msg.speaker == "clara" else "user"
@@ -358,17 +274,14 @@ You have {remaining} questions remaining before the limit.
                 "role": role,
                 "content": msg.text
             })
-
         return history
 
     def _generate_closing_message(self) -> str:
-
         closing_script = f"""Thank you so much for taking the time to speak with me today, {self.patient_name}. Your responses will help {self.doctor_name} provide you with the best possible care.
 
 If you feel there was anything you forgot to mention or would like to add, you can use the same link to speak with me again before your appointment.
 
 Take care, and I hope your appointment goes well!"""
-
         return closing_script
 
     def get_conversation_summary(self) -> Dict[str, any]:
@@ -384,11 +297,8 @@ Take care, and I hope your appointment goes well!"""
 
     def save_conversation(self, save_dir: Path = Path("data/conversations")):
         save_dir.mkdir(parents=True, exist_ok=True)
-
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{self.patient_name.replace(' ', '_')}_{self.state.conversation_id[:8]}.json"
         filepath = save_dir / filename
-
         self.state.save_to_file(filepath)
-
         return filepath
