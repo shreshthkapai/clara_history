@@ -1,0 +1,4 @@
+libasound2
+libasound2-plugins
+alsa-utils
+ffmpeg
