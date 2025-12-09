@@ -60,16 +60,7 @@ class SummaryGenerator:
             # Output 5: Probable conditions
             "probable_conditions": self._generate_probable_conditions(transcript),
             
-            # Additional metadata
-            "red_flags": [
-                {
-                    "category": flag.category,
-                    "severity": flag.severity,
-                    "action_taken": flag.action_taken
-                }
-                for flag in conversation_state.red_flags_detected
-            ],
-            
+            # Conversation stats
             "conversation_stats": {
                 "total_messages": len(transcript),
                 "questions_asked": conversation_state.question_count,
@@ -115,19 +106,6 @@ Keep it extremely concise and clinical. This is for a busy GP to scan quickly be
 
 Do NOT include: past medical history, medications, or detailed questions asked."""
         
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Summarize this conversation in 2-3 sentences:\n\n{transcript_text}"}
-        ]
-        
-        summary = self.openai_service.get_clara_response(
-            conversation_history=[],
-            system_prompt=system_prompt,
-            temperature=0.3,
-            max_tokens=200
-        )
-        
-        # Pass transcript as user message instead
         try:
             from openai import AzureOpenAI
             from config.settings import settings

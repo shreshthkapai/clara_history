@@ -105,27 +105,6 @@ class ConversationState(BaseModel):
         
         return incomplete_with_priority[0][0]
 
-    def should_end_conversation(self) -> tuple[bool, str]:
-        """
-        Determine if conversation should end
-        Returns: (should_end, reason)
-        """
-        
-        # Hit question limit - hard stop
-        if self.question_count >= self.max_questions:
-            return (True, "max_questions")
-        
-        # If closing topic is marked complete, END immediately
-        if self.is_topic_complete('closing'):
-            return (True, "completed")
-        
-        # If all required topics done (including closing)
-        incomplete_required = self.get_incomplete_required_topics()
-        if not incomplete_required:
-            return (True, "completed")
-        
-        return (False, "continue")
-    
     def get_progress_summary(self) -> Dict[str, Any]:
         """Get conversation progress summary"""
         return {

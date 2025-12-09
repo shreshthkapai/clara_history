@@ -61,10 +61,22 @@ class ClaraAgent:
     def process_patient_response(self, patient_message: str) -> Tuple[str, bool, Optional[str]]:
         """Process patient response and generate next question"""
         
+        # Add patient's message
         self.state.add_message(
             speaker="patient",
             text=patient_message
         )
+
+        # Check max questions BEFORE getting AI decision
+        if self.state.question_count >= self.state.max_questions:
+            closing_message = self._generate_closing_message()
+            self.state.add_message(
+                speaker="clara",
+                text=closing_message,
+                topic="closing"
+            )
+            self.state.end_conversation(status="completed")
+            return (closing_message, True, "max_questions")
 
         # Get AI decision
         decision = self._get_clara_decision()
@@ -78,7 +90,7 @@ class ClaraAgent:
             if topic in self.state.topics_optional:
                 self.state.mark_topic_complete(topic)
 
-        # Check if conversation should end
+        # Check if AI says conversation should end
         if decision.get('conversation_complete', False):
             closing_message = self._generate_closing_message()
             self.state.add_message(
@@ -88,17 +100,6 @@ class ClaraAgent:
             )
             self.state.end_conversation(status="completed")
             return (closing_message, True, "completed")
-
-        # Check max questions limit
-        if self.state.question_count >= self.state.max_questions:
-            closing_message = self._generate_closing_message()
-            self.state.add_message(
-                speaker="clara",
-                text=closing_message,
-                topic="closing"
-            )
-            self.state.end_conversation(status="completed")
-            return (closing_message, True, "max_questions")
 
         # Continue with next question
         next_question = decision.get('next_question', "Is there anything else you'd like to share?")
@@ -167,7 +168,8 @@ OPTIONAL TOPICS (only ask if relevant):
 
 CONVERSATION COMPLETE when:
 - All required topics covered AND
-- Patient said "no"/"nothing"/"that's all" to closing question
+- Patient said "no"/"nothing"/"that's all"/"nope" to closing question
+- When setting conversation_complete to true, you do NOT need to provide a next_question
 
 TOPIC COMPLETION:
 - Mark topics in "topics_completed" when patient has given sufficient information

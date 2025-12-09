@@ -18,6 +18,9 @@ def initialize_chat_session():
     
     if 'conversation_ended' not in st.session_state:
         st.session_state.conversation_ended = False
+    
+    if 'voice_input_processing' not in st.session_state:
+        st.session_state.voice_input_processing = False
 
 
 def render_chat_header():
@@ -127,7 +130,19 @@ def render_patient_input(speech_service: AzureSpeechService) -> Optional[str]:
         
         st.info("Click the button below and speak. It will stop automatically after you finish speaking.")
         
-        if st.button("🎤 Press & Speak", type="primary", use_container_width=True, key=f"voice_btn_{len(st.session_state.messages)}"):
+        # Disable button if already processing
+        button_disabled = st.session_state.voice_input_processing
+        
+        if st.button(
+            "🎤 Press & Speak", 
+            type="primary", 
+            use_container_width=True, 
+            key=f"voice_btn_{len(st.session_state.messages)}",
+            disabled=button_disabled
+        ):
+            # Set processing flag to prevent multiple clicks
+            st.session_state.voice_input_processing = True
+            
             with st.spinner("🎤 Listening... Speak now!"):
                 recognized_text = speech_service.speech_to_text_from_mic()
                 
@@ -135,9 +150,11 @@ def render_patient_input(speech_service: AzureSpeechService) -> Optional[str]:
                     # Store in session state
                     st.session_state.pending_voice_input = recognized_text
                     st.success(f"✅ You said: {recognized_text}")
+                    st.session_state.voice_input_processing = False
                     st.rerun()
                 else:
                     st.error("Couldn't hear you clearly. Please try again.")
+                    st.session_state.voice_input_processing = False
     
     # Check for pending voice input
     if 'pending_voice_input' in st.session_state:
