@@ -97,14 +97,19 @@ class SummaryGenerator:
 
 Generate a 2-3 sentence summary ONLY. Use clinical shorthand.
 
-Examples of GOOD style:
-- "32F, 3/7 history lower abdominal pain, worse on movement. Denies fever, vomiting. Regular cycles."
-- "58M, exertional chest tightness x 2/52. FHx IHD (father MI age 50). Smoker 20/day."
-- "45F, worsening fatigue x 6/12. Known hypothyroid, compliant with levothyroxine. Recent stressors at work."
+**CRITICAL RULE**: ONLY include age/sex if the patient explicitly mentioned it in the conversation. If they didn't mention it, DO NOT GUESS OR INVENT IT. Start directly with the duration and chief complaint.
 
-NO filler words. NO narrative prose. Just facts.
+Examples when age/sex NOT mentioned:
+- "3/7 history lower abdominal pain, worse on movement. Denies fever, vomiting. Regular cycles."
+- "Exertional chest tightness x 2/52. FHx IHD (father MI age 50). Smoker 20/day."
 
-Format: [Age/Sex if mentioned], [duration] history of [chief complaint], [key modifiers]. [Critical context]."""
+Examples when age/sex WERE mentioned:
+- "32F, 3/7 history lower abdominal pain, worse on movement."
+- "58M, exertional chest tightness x 2/52."
+
+NO filler words. NO narrative prose. NO invented demographics. Only facts explicitly stated.
+
+Format: [Age/Sex ONLY if stated], [duration] history of [chief complaint], [key modifiers]. [Critical context]."""
         
         try:
             from openai import AzureOpenAI
@@ -158,10 +163,13 @@ Format: [Age/Sex if mentioned], [duration] history of [chief complaint], [key mo
 
 NO waffle. NO filler. NO flowery language. Just clinical facts.
 
+**CRITICAL RULE**: Only document information explicitly mentioned in the conversation. DO NOT infer or guess age, sex, or other demographics. If not stated, omit them.
+
 Use these sections:
 
 **PC (Presenting Complaint)**
 One line. E.g., "3/52 intermittent palpitations"
+If age/sex mentioned: "32F, 3/52 intermittent palpitations"
 
 **HPC (History of Presenting Complaint)**
 Tight bullet points or abbreviated sentences:
@@ -200,7 +208,7 @@ USE ABBREVIATIONS: HPC, PMHx, FHx, SHx, BP, DM, IHD, GORD, etc.
 USE SHORTHAND: 3/7 (3 days), 2/52 (2 weeks), 6/12 (6 months)
 BE CONCISE: "No CP, SOB, or syncope" not "The patient denies experiencing chest pain, shortness of breath, or syncopal episodes"
 
-This is CLINICAL DOCUMENTATION, not a story."""
+This is CLINICAL DOCUMENTATION, not a story. Document ONLY what was explicitly stated."""
         
         try:
             from openai import AzureOpenAI
