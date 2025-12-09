@@ -72,7 +72,7 @@
     },
     "family_history": {
       "name": "Family History",
-      "required": false,
+      "required": true,
       "completed": false,
       "priority": 6,
       "questions": [
@@ -93,7 +93,7 @@
     },
     "systems_review": {
       "name": "Systems Review (Targeted)",
-      "required": false,
+      "required": true,
       "completed": false,
       "priority": 8,
       "categories": [
@@ -105,7 +105,7 @@
         "skin",
         "mental_health"
       ],
-      "note": "Only ask about systems relevant to presenting complaint"
+      "note": "Ask about systems relevant to presenting complaint - don't skip this"
     },
     "gynae_sexual": {
       "name": "Gynaecological / Sexual History",
@@ -131,7 +131,7 @@
   
   "conversation_rules": {
     "max_questions": 30,
-    "min_required_topics": 6,
+    "min_required_topics": 9,
     "adaptive_questioning": true,
     "follow_up_depth": "based_on_response",
     "empathy_required": true,

@@ -13,6 +13,7 @@ class Settings:
     AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")
 
     MAX_QUESTIONS = int(os.getenv("MAX_QUESTIONS", 30))
+    MIN_REQUIRED_TOPICS = int(os.getenv("MIN_REQUIRED_TOPICS", 9))
     CONVERSATION_TIMEOUT_MINUTES = int(os.getenv("CONVERSATION_TIMEOUT_MINUTES", 15))
 
     @classmethod

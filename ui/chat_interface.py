@@ -1,7 +1,6 @@
 import streamlit as st
 from typing import Optional, Tuple
 from services.azure_speech import AzureSpeechService
-from audio_recorder_streamlit import audio_recorder
 import io
 
 
@@ -140,21 +139,22 @@ def render_patient_input(speech_service: AzureSpeechService) -> Optional[str]:
             key=f"voice_btn_{len(st.session_state.messages)}",
             disabled=button_disabled
         ):
-            # Set processing flag to prevent multiple clicks
             st.session_state.voice_input_processing = True
-            
-            with st.spinner("🎤 Listening... Speak now!"):
-                recognized_text = speech_service.speech_to_text_from_mic()
-                
-                if recognized_text:
-                    # Store in session state
-                    st.session_state.pending_voice_input = recognized_text
-                    st.success(f"✅ You said: {recognized_text}")
-                    st.session_state.voice_input_processing = False
-                    st.rerun()
-                else:
-                    st.error("Couldn't hear you clearly. Please try again.")
-                    st.session_state.voice_input_processing = False
+
+            try:
+                with st.spinner("🎤 Listening... Speak now!"):
+                    recognized_text = speech_service.speech_to_text_from_mic()
+
+                    if recognized_text:
+                        st.session_state.pending_voice_input = recognized_text
+                        st.success(f"✅ You said: {recognized_text}")
+                        st.rerun()
+                    else:
+                        st.error("Couldn't hear you clearly. Please try again.")
+            except Exception as e:
+                st.error(f"Voice input error: {e}")
+            finally:
+                st.session_state.voice_input_processing = False
     
     # Check for pending voice input
     if 'pending_voice_input' in st.session_state:

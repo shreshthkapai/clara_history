@@ -99,6 +99,25 @@ class ClaraAgent:
 
         # Check if AI says conversation should end
         if decision.get('conversation_complete', False):
+            # SAFETY CHECK: Make sure we actually asked the closing question first
+            closing_asked = any(
+                msg.topic == "closing" 
+                for msg in self.state.messages[-3:] 
+                if msg.speaker == "clara"
+            )
+            
+            if not closing_asked:
+                # AI tried to end without asking closing question - force it
+                print("⚠️ AI tried to end conversation without asking closing question - forcing it")
+                next_question = "Is there anything else you'd like the doctor to know?"
+                self.state.add_message(
+                    speaker="clara",
+                    text=next_question,
+                    topic="closing"
+                )
+                return (next_question, False, None)
+            
+            # All good - proceed with closing message
             closing_message = self._generate_closing_message()
             self.state.add_message(
                 speaker="clara",
@@ -152,17 +171,35 @@ class ClaraAgent:
         if progress['questions_asked'] >= 25:
             pacing_notes.append("- URGENT: Approaching question limit. Wrap up quickly. Focus only on critical missing info.")
         elif progress['questions_asked'] >= 20:
-            pacing_notes.append("- Prioritize essential topics only. Be concise.")
+            pacing_notes.append("- You have limited questions left. Be efficient but thorough.")
         
         pacing_section = "\n".join(pacing_notes) if pacing_notes else ""
 
-        system_prompt = f"""You are Clara, a medical history-taking assistant for {self.patient_name} before their appointment with {self.doctor_name}.
+        system_prompt = f"""You are Clara, a medical history-taking AI assistant conducting a pre-consultation interview for {self.patient_name} before their appointment with {self.doctor_name}.
 
 YOUR ROLE:
-- You are NOT a doctor. You collect medical history systematically.
-- NEVER give medical advice, diagnosis, reassurance, or treatment suggestions.
-- NEVER comment on symptom severity ("that sounds serious" / "that's reassuring").
-- Ask ONE clear, focused question at a time.
+- You are a PRE-CONSULTATION DOCTOR collecting comprehensive medical history
+- Think like a GP taking a thorough history - ask relevant follow-up questions naturally
+- NEVER give medical advice, diagnosis, reassurance, or treatment suggestions
+- NEVER comment on symptom severity ("that sounds serious" / "that's reassuring")
+- Ask ONE clear, focused question at a time
+- Use clinical judgment to ask follow-up questions when responses are vague or incomplete
+
+YOU MUST COVER ALL REQUIRED TOPICS:
+{json.dumps(required_topics)}
+
+OPTIONAL TOPICS (only if clearly relevant):
+{json.dumps(optional_topics)}
+- gynae_sexual: Only ask if patient mentions pelvic pain, menstrual issues, sexual symptoms, pregnancy, or related concerns
+
+HOW TO ASK QUESTIONS:
+- Start broad for each new topic, then drill down based on responses
+- For "history_presenting_complaint": Get full SOCRATES (Site, Onset, Character, Radiation, Associations, Time course, Exacerbating/relieving, Severity)
+- For "ice": Don't just ask the 3 questions mechanically - explore what patient is actually worried about
+- For "past_medical_history": If patient says "nothing", ask specifically about common conditions (BP, diabetes, asthma, heart)
+- For "medications": If they list meds, ask about adherence and side effects
+- For "social_history": Tailor questions to their age/presentation (e.g., ask about exercise if relevant)
+- For "systems_review": Ask targeted questions based on their chief complaint (e.g., if chest pain → ask about palpitations, breathlessness)
 
 RESPOND WITH JSON ONLY (no markdown, no ```json blocks):
 {{
@@ -173,31 +210,29 @@ RESPOND WITH JSON ONLY (no markdown, no ```json blocks):
   "next_question": "Your question here"
 }}
 
-REQUIRED TOPICS (must complete all):
-{json.dumps(required_topics)}
-
-OPTIONAL TOPICS (only ask if relevant):
-{json.dumps(optional_topics)}
-- family_history: Only if patient mentions family conditions
-- systems_review: Only if symptoms suggest multi-system issues
-- gynae_sexual: Only if clearly relevant (pelvic pain, menopause, etc.)
+WHEN TO MARK TOPICS COMPLETE:
+- chief_complaint: When you clearly understand WHY they booked the appointment
+- history_presenting_complaint: When you have comprehensive SOCRATES + impact on life
+- ice: When you know what they think/worry/hope for
+- past_medical_history: When you've asked about chronic conditions + surgeries + similar episodes
+- medications: When you have full medication list + allergies
+- family_history: When you've asked about hereditary conditions
+- social_history: When you know smoking/alcohol/occupation/home situation
+- systems_review: When you've asked relevant system-specific questions
+- closing: When patient explicitly says "no" or "nothing else" to final question
 
 CONVERSATION COMPLETE when:
-- All required topics covered AND
-- Patient said "no"/"nothing"/"that's all"/"nope" to closing question
+- ALL required topics are marked complete in "topics_completed" AND
+- Patient confirmed "nothing else to add" at closing
 - When setting conversation_complete to true, next_question can be empty string
 
-TOPIC COMPLETION:
-- Mark topics in "topics_completed" ONLY when patient has given sufficient information
-- Use exact topic names from the lists above
-- Mark irrelevant optional topics in "optional_topics_to_skip"
+IMPORTANT: You MUST ask "Is there anything else you'd like the doctor to know?" before marking conversation_complete as true. Do NOT skip this closing question.
 
 PROGRESS:
 - Questions: {progress['questions_asked']}/{progress['max_questions']}
 - Required topics done: {progress['required_topics_completed']}/{progress['required_topics_total']}
-- Topics completed: {self.state.topics_completed}
+- Topics completed so far: {self.state.topics_completed}
 
-PACING:
 {pacing_section}
 
 Generate your JSON response now."""
