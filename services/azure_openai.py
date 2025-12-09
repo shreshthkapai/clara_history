@@ -179,33 +179,50 @@ class AzureOpenAIService:
         ])
         
         if summary_type == "short":
-            system_prompt = """You are a medical documentation assistant. 
-                                Generate a brief 30-second read summary (2-3 sentences) of this patient conversation.
-                                Focus on: primary concern, key symptoms, duration, and what the patient hopes to achieve. 
-                                Keep it concise and clinical."""
+            system_prompt = """You are writing doctor-to-doctor handover notes. Be HYPER EFFICIENT.
+
+Generate a 2-3 sentence summary ONLY. Use clinical shorthand.
+
+Examples of GOOD style:
+- "32F, 3/7 history lower abdominal pain, worse on movement. Denies fever, vomiting. Regular cycles."
+- "58M, exertional chest tightness x 2/52. FHx IHD (father MI age 50). Smoker 20/day."
+- "45F, worsening fatigue x 6/12. Known hypothyroid, compliant with levothyroxine. Recent stressors at work."
+
+NO filler words. NO narrative prose. Just facts.
+
+Format: [Age/Sex if mentioned], [duration] history of [chief complaint], [key modifiers]. [Critical context]."""
         
         else: 
-            system_prompt = """You are a medical documentation assistant.
-                                Generate a structured clinical summary with these sections:
-                                - Primary Concern: One line describing main reason for visit
-                                - Key Symptoms: 2-4 short symptom tags
-                                - Duration: How long symptoms have been present
-                                - Current Medications: List medications mentioned
-                                - Relevant Medical History: Previous conditions, surgeries, similar issues
-                                - Ideas, Concerns, Expectations (ICE): What patient thinks/worries/hopes
-                                - Social Context: Brief relevant lifestyle factors
-                                Be thorough but concise. Use clinical language."""
+            system_prompt = """You are writing clinical notes for a GP. Write in TIGHT, EFFICIENT doctor-to-doctor style.
+
+NO waffle. NO filler. NO flowery language. Just clinical facts.
+
+Use abbreviations: HPC, PMHx, FHx, SHx, BP, DM, IHD, etc.
+Use shorthand: 3/7 (3 days), 2/52 (2 weeks), 6/12 (6 months)
+Be concise: "No CP, SOB" not "The patient denies chest pain or shortness of breath"
+
+Structure:
+- PC: [one line]
+- HPC: [tight bullets or abbreviated sentences with SOCRATES]
+- ICE: [what they think/worry/want]
+- PMHx: [list format]
+- Meds: [list with doses]
+- FHx: [relevant conditions]
+- SHx: [smoking/alcohol/occupation/living]
+- RFs: [red flags or relevant negatives]
+
+This is CLINICAL DOCUMENTATION, not a story."""
         
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Please summarize this patient conversation:\n\n{transcript_text}"}
+            {"role": "user", "content": f"Generate clinical notes:\n\n{transcript_text}"}
         ]
         
         try:
             response = self.client.chat.completions.create(
                 model=self.deployment_name,
                 messages=messages,
-                temperature=0.3,
+                temperature=0.2,
                 max_tokens=800
             )
             
@@ -226,14 +243,18 @@ class AzureOpenAIService:
             for msg in transcript
         ])
 
-        system_prompt = """You are a medical preparation assistant. Based on this patient conversation, generate a list of 2-5 specific items the GP should prepare or have ready for the appointment.
-                            Examples:
-                                    - "Recent blood pressure readings"
-                                    - "ECG results from last visit"
-                                    - "Current medication list"
-                                    - "Blood glucose monitoring log"
-                                    - "Previous imaging reports"
-                            Respond with ONLY a comma-separated list, no numbering or bullets."""
+        system_prompt = """You are writing prep items for a GP. Be TIGHT and SPECIFIC.
+
+Examples of GOOD prep items:
+- "Recent BP readings (last 3/12)"
+- "HbA1c from Aug 2024"
+- "ECG - query previous abnormalities"
+- "Chest X-ray report 2023"
+- "Current repeat prescriptions list"
+
+NOT vague items like "medical history" or "test results"
+
+Respond with ONLY a comma-separated list. No bullets. No numbering."""
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -244,7 +265,7 @@ class AzureOpenAIService:
             response = self.client.chat.completions.create(
                 model=self.deployment_name,
                 messages=messages,
-                temperature=0.4,
+                temperature=0.3,
                 max_tokens=200
             )
             
@@ -267,19 +288,24 @@ class AzureOpenAIService:
             for msg in transcript
         ])
 
-        system_prompt = """You are a clinical reasoning assistant helping a GP prepare for a consultation. Based on the patient's presentation, suggest 2-4 probable conditions that should be considered.
-                            For each condition, provide:
-                                                        1. Condition name
-                                                        2. Brief rationale (which symptoms/factors support this)
+        system_prompt = """You are a GP generating a differential diagnosis list. Write TIGHT clinical reasoning.
 
-                            Format your response as:    
-                                                    CONDITION: [name]
-                                                    RATIONALE: [1-2 sentences]
-                                                    
-                                                    CONDITION: [name]
-                                                    RATIONALE: [1-2 sentences]
-                            
-                            Remember: This is clinical decision support for the GP, not a diagnosis. Focus on common presentations first."""
+For each condition (2-4 max), provide:
+
+CONDITION: [name]
+RATIONALE: [Brief - why this fits. Use clinical shorthand.]
+
+Examples of GOOD style:
+CONDITION: Acute coronary syndrome
+RATIONALE: Central CP radiating to L arm, exertional, FHx IHD. Risk factors: smoker, HTN.
+
+CONDITION: Costochondritis  
+RATIONALE: Sharp, localized, reproducible on palpation. No radiation. No cardiac RFs.
+
+CONDITION: Iron deficiency anaemia
+RATIONALE: 6/12 fatigue + menorrhagia. Likely cause of symptoms.
+
+NO waffle. Just facts supporting each DDx. Think common things common."""
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -290,7 +316,7 @@ class AzureOpenAIService:
             response = self.client.chat.completions.create(
                 model=self.deployment_name,
                 messages=messages,
-                temperature=0.5,
+                temperature=0.4,
                 max_tokens=600
             )
             

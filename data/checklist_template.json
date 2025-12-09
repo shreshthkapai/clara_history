@@ -76,8 +76,11 @@
       "completed": false,
       "priority": 6,
       "questions": [
-        "Does anyone in your family have heart disease, diabetes, cancer, or other serious conditions?"
-      ]
+        "Can you tell me about any health conditions that run in your family?",
+        "Has anyone in your immediate family - parents, siblings, or children - had any serious illnesses or medical conditions which u think are worth sharing?",
+        "Are there any conditions that multiple family members have had?"
+      ],
+      "note": "Cast a wide net - ask about general health conditions, early deaths, patterns across family members. Don't limit to specific diseases."
     },
     "social_history": {
       "name": "Social History",
@@ -105,7 +108,7 @@
         "skin",
         "mental_health"
       ],
-      "note": "Ask about systems relevant to presenting complaint - don't skip this"
+      "note": "Ask about general wellbeing and broader symptoms, not just those directly related to presenting complaint"
     },
     "gynae_sexual": {
       "name": "Gynaecological / Sexual History",

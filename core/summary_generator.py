@@ -93,18 +93,18 @@ class SummaryGenerator:
             for msg in transcript
         ])
         
-        system_prompt = """You are a medical documentation assistant.
+        system_prompt = """You are writing doctor-to-doctor handover notes. Be HYPER EFFICIENT.
 
-Generate a BRIEF 30-second read summary (2-3 sentences maximum) of this patient conversation.
+Generate a 2-3 sentence summary ONLY. Use clinical shorthand.
 
-Focus ONLY on:
-- Primary concern (what's wrong)
-- Key symptoms
-- What patient hopes to achieve
+Examples of GOOD style:
+- "32F, 3/7 history lower abdominal pain, worse on movement. Denies fever, vomiting. Regular cycles."
+- "58M, exertional chest tightness x 2/52. FHx IHD (father MI age 50). Smoker 20/day."
+- "45F, worsening fatigue x 6/12. Known hypothyroid, compliant with levothyroxine. Recent stressors at work."
 
-Keep it extremely concise and clinical. This is for a busy GP to scan quickly before the appointment.
+NO filler words. NO narrative prose. Just facts.
 
-Do NOT include: past medical history, medications, or detailed questions asked."""
+Format: [Age/Sex if mentioned], [duration] history of [chief complaint], [key modifiers]. [Critical context]."""
         
         try:
             from openai import AzureOpenAI
@@ -122,8 +122,8 @@ Do NOT include: past medical history, medications, or detailed questions asked."
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": transcript_text}
                 ],
-                temperature=0.3,
-                max_tokens=200
+                temperature=0.2,
+                max_tokens=150
             )
             
             summary = response.choices[0].message.content.strip()
@@ -154,37 +154,53 @@ Do NOT include: past medical history, medications, or detailed questions asked."
             for msg in transcript
         ])
         
-        system_prompt = """You are a medical documentation assistant creating a detailed clinical summary.
+        system_prompt = """You are writing clinical notes for a GP. Write in TIGHT, EFFICIENT doctor-to-doctor style.
 
-Generate a structured summary with these sections:
+NO waffle. NO filler. NO flowery language. Just clinical facts.
 
-**PRIMARY CONCERN**
-One line describing main reason for visit.
+Use these sections:
 
-**KEY SYMPTOMS**
-List 2-4 main symptoms with duration and character.
+**PC (Presenting Complaint)**
+One line. E.g., "3/52 intermittent palpitations"
 
-**HISTORY OF PRESENTING COMPLAINT**
-Onset, progression, severity, triggers/relievers, associated symptoms, impact on daily life.
+**HPC (History of Presenting Complaint)**
+Tight bullet points or abbreviated sentences:
+- Onset: [when it started]
+- Character: [what it feels like]
+- Severity: [scale or description]
+- Timing: [frequency, pattern]
+- Exacerbating/relieving: [what makes it better/worse]
+- Associated symptoms: [other symptoms]
+- Impact: [effect on daily life]
 
-**IDEAS, CONCERNS, EXPECTATIONS (ICE)**
-- What patient thinks is causing it
-- What worries them
-- What they hope to achieve from appointment
+**ICE**
+- Ideas: [what pt thinks]
+- Concerns: [what worries them]
+- Expectations: [what they want]
 
-**PAST MEDICAL HISTORY**
-Chronic conditions, previous surgeries, similar episodes.
+**PMHx**
+List format: HTN, T2DM, etc. Include surgeries if any.
 
-**CURRENT MEDICATIONS**
-List all medications with doses if mentioned. Include allergies.
+**Medications**
+List with doses if given. Note allergies.
 
-**SOCIAL HISTORY**
-Smoking, alcohol, occupation, living situation, relevant lifestyle factors.
+**FHx**
+Brief. List relevant conditions + age at onset/death if mentioned.
 
-**RED FLAGS**
-Any concerning symptoms mentioned or explicitly denied (e.g., "denies chest pain, breathlessness").
+**SHx**
+Smoking: [pack-years or never]
+Alcohol: [units/week]
+Occupation: [job]
+Living situation: [brief]
 
-Use clear clinical language. Be thorough but concise."""
+**RFs (Red Flags / Relevant Negatives)**
+What patient explicitly denied or concerning symptoms mentioned.
+
+USE ABBREVIATIONS: HPC, PMHx, FHx, SHx, BP, DM, IHD, GORD, etc.
+USE SHORTHAND: 3/7 (3 days), 2/52 (2 weeks), 6/12 (6 months)
+BE CONCISE: "No CP, SOB, or syncope" not "The patient denies experiencing chest pain, shortness of breath, or syncopal episodes"
+
+This is CLINICAL DOCUMENTATION, not a story."""
         
         try:
             from openai import AzureOpenAI
@@ -200,9 +216,9 @@ Use clear clinical language. Be thorough but concise."""
                 model=settings.AZURE_OPENAI_DEPLOYMENT_NAME,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Generate detailed clinical summary:\n\n{transcript_text}"}
+                    {"role": "user", "content": f"Generate clinical notes:\n\n{transcript_text}"}
                 ],
-                temperature=0.3,
+                temperature=0.2,
                 max_tokens=1000
             )
             

@@ -194,12 +194,13 @@ OPTIONAL TOPICS (only if clearly relevant):
 
 HOW TO ASK QUESTIONS:
 - Start broad for each new topic, then drill down based on responses
-- For "history_presenting_complaint": Get full SOCRATES (Site, Onset, Character, Radiation, Associations, Time course, Exacerbating/relieving, Severity)
+- For "history_presenting_complaint": Get full SOCRATES (Site, Onset, Character, Radiation, Associations, Time course, Exacerbating/relieving, Severity) but focus on general patterns rather than hyper-specific symptom details
 - For "ice": Don't just ask the 3 questions mechanically - explore what patient is actually worried about
 - For "past_medical_history": If patient says "nothing", ask specifically about common conditions (BP, diabetes, asthma, heart)
 - For "medications": If they list meds, ask about adherence and side effects
+- For "family_history": Cast a wide net - ask about ANY serious illnesses in immediate family (parents, siblings, children), early deaths, patterns across multiple family members. Don't limit to specific named diseases like "diabetes" or "heart disease" - explore what they volunteer about general family health
 - For "social_history": Tailor questions to their age/presentation (e.g., ask about exercise if relevant)
-- For "systems_review": Ask targeted questions based on their chief complaint (e.g., if chest pain → ask about palpitations, breathlessness)
+- For "systems_review": Ask about general wellbeing and how they've been feeling overall, not just symptoms directly related to their chief complaint. Be holistic.
 
 RESPOND WITH JSON ONLY (no markdown, no ```json blocks):
 {{
@@ -212,13 +213,13 @@ RESPOND WITH JSON ONLY (no markdown, no ```json blocks):
 
 WHEN TO MARK TOPICS COMPLETE:
 - chief_complaint: When you clearly understand WHY they booked the appointment
-- history_presenting_complaint: When you have comprehensive SOCRATES + impact on life
+- history_presenting_complaint: When you have comprehensive SOCRATES + impact on life (focus on general patterns, not hyper-specific details)
 - ice: When you know what they think/worry/hope for
 - past_medical_history: When you've asked about chronic conditions + surgeries + similar episodes
 - medications: When you have full medication list + allergies
-- family_history: When you've asked about hereditary conditions
+- family_history: When you've explored general family health patterns, early deaths, and conditions running in the family (don't limit to specific diseases - cast a wide net)
 - social_history: When you know smoking/alcohol/occupation/home situation
-- systems_review: When you've asked relevant system-specific questions
+- systems_review: When you've asked about general wellbeing and broader health (not just targeted symptom questions)
 - closing: When patient explicitly says "no" or "nothing else" to final question
 
 CONVERSATION COMPLETE when:
