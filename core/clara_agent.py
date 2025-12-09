@@ -81,14 +81,21 @@ class ClaraAgent:
         # Get AI decision
         decision = self._get_clara_decision()
 
-        # Mark completed topics
+        # Validate and mark completed topics (only if they exist in checklist)
         for topic in decision.get('topics_completed', []):
-            self.state.mark_topic_complete(topic)
+            if topic in self.state.checklist:
+                self.state.mark_topic_complete(topic)
+            else:
+                print(f"⚠️ AI suggested unknown topic to complete: '{topic}' - ignoring")
 
-        # Skip irrelevant optional topics
+        # Skip irrelevant optional topics (only if they exist and are optional)
         for topic in decision.get('optional_topics_to_skip', []):
             if topic in self.state.topics_optional:
                 self.state.mark_topic_complete(topic)
+            elif topic in self.state.checklist:
+                print(f"⚠️ AI tried to skip required topic: '{topic}' - ignoring")
+            else:
+                print(f"⚠️ AI suggested unknown topic to skip: '{topic}' - ignoring")
 
         # Check if AI says conversation should end
         if decision.get('conversation_complete', False):
@@ -140,6 +147,15 @@ class ClaraAgent:
 
         progress = self.state.get_progress_summary()
 
+        # Build pacing warnings conditionally
+        pacing_notes = []
+        if progress['questions_asked'] >= 25:
+            pacing_notes.append("- URGENT: Approaching question limit. Wrap up quickly. Focus only on critical missing info.")
+        elif progress['questions_asked'] >= 20:
+            pacing_notes.append("- Prioritize essential topics only. Be concise.")
+        
+        pacing_section = "\n".join(pacing_notes) if pacing_notes else ""
+
         system_prompt = f"""You are Clara, a medical history-taking assistant for {self.patient_name} before their appointment with {self.doctor_name}.
 
 YOUR ROLE:
@@ -148,7 +164,7 @@ YOUR ROLE:
 - NEVER comment on symptom severity ("that sounds serious" / "that's reassuring").
 - Ask ONE clear, focused question at a time.
 
-RESPOND WITH JSON ONLY:
+RESPOND WITH JSON ONLY (no markdown, no ```json blocks):
 {{
   "conversation_complete": boolean,
   "topics_completed": ["topic1", "topic2"],
@@ -169,10 +185,11 @@ OPTIONAL TOPICS (only ask if relevant):
 CONVERSATION COMPLETE when:
 - All required topics covered AND
 - Patient said "no"/"nothing"/"that's all"/"nope" to closing question
-- When setting conversation_complete to true, you do NOT need to provide a next_question
+- When setting conversation_complete to true, next_question can be empty string
 
 TOPIC COMPLETION:
-- Mark topics in "topics_completed" when patient has given sufficient information
+- Mark topics in "topics_completed" ONLY when patient has given sufficient information
+- Use exact topic names from the lists above
 - Mark irrelevant optional topics in "optional_topics_to_skip"
 
 PROGRESS:
@@ -181,8 +198,7 @@ PROGRESS:
 - Topics completed: {self.state.topics_completed}
 
 PACING:
-{"- URGENT: Approaching question limit. Wrap up quickly. Focus only on critical missing info." if progress['questions_asked'] >= 25 else ""}
-{"- Prioritize essential topics only. Be concise." if progress['questions_asked'] >= 20 else ""}
+{pacing_section}
 
 Generate your JSON response now."""
 
