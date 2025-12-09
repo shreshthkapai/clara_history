@@ -93,23 +93,15 @@ class SummaryGenerator:
             for msg in transcript
         ])
         
-        system_prompt = """You are writing doctor-to-doctor handover notes. Be HYPER EFFICIENT.
+        system_prompt = """You are a UK GP writing clinical handover notes. Write a tight 2-3 sentence summary using standard UK medical shorthand.
 
-Generate a 2-3 sentence summary ONLY. Use clinical shorthand.
+**KEY RULES:**
+- Use UK notation: X/7 (days), X/52 (weeks), X/12 (months)
+- Only include age/sex if explicitly stated - DO NOT INFER
+- If duration uncertain, document the uncertainty (e.g., "?2-4/52")
+- Use standard descriptors: intermittent, constant, progressive, etc.
 
-**CRITICAL RULE**: ONLY include age/sex if the patient explicitly mentioned it in the conversation. If they didn't mention it, DO NOT GUESS OR INVENT IT. Start directly with the duration and chief complaint.
-
-Examples when age/sex NOT mentioned:
-- "3/7 history lower abdominal pain, worse on movement. Denies fever, vomiting. Regular cycles."
-- "Exertional chest tightness x 2/52. FHx IHD (father MI age 50). Smoker 20/day."
-
-Examples when age/sex WERE mentioned:
-- "32F, 3/7 history lower abdominal pain, worse on movement."
-- "58M, exertional chest tightness x 2/52."
-
-NO filler words. NO narrative prose. NO invented demographics. Only facts explicitly stated.
-
-Format: [Age/Sex ONLY if stated], [duration] history of [chief complaint], [key modifiers]. [Critical context]."""
+Write as you would for a colleague in real clinical practice - efficient, factual, no waffle."""
         
         try:
             from openai import AzureOpenAI
@@ -159,56 +151,25 @@ Format: [Age/Sex ONLY if stated], [duration] history of [chief complaint], [key 
             for msg in transcript
         ])
         
-        system_prompt = """You are writing clinical notes for a GP. Write in TIGHT, EFFICIENT doctor-to-doctor style.
+        system_prompt = """You are a UK GP writing clinical notes for a colleague. Write in tight, efficient doctor-to-doctor style using standard UK medical shorthand.
 
-NO waffle. NO filler. NO flowery language. Just clinical facts.
+**KEY RULES:**
+- Only document information explicitly mentioned - DO NOT INFER age, sex, or details
+- Use UK notation: X/7 (days), X/52 (weeks), X/12 (months)
+- Document uncertainty when present (e.g., "Onset: ?2-4/52")
+- Use standard abbreviations: HPC, PMHx, FHx, SHx, CP, SOB, etc.
 
-**CRITICAL RULE**: Only document information explicitly mentioned in the conversation. DO NOT infer or guess age, sex, or other demographics. If not stated, omit them.
+**Structure:**
+- PC: [one line - duration + pattern + complaint]
+- HPC: [SOCRATES format - tight bullets or brief sentences]
+- ICE: [what they think/worry/want]
+- PMHx: [list format]
+- Medications: [list with doses if given, note allergies]
+- FHx: [relevant conditions]
+- SHx: [smoking/alcohol/occupation/living]
+- RFs: [red flags or relevant negatives]
 
-Use these sections:
-
-**PC (Presenting Complaint)**
-One line. E.g., "3/52 intermittent palpitations"
-If age/sex mentioned: "32F, 3/52 intermittent palpitations"
-
-**HPC (History of Presenting Complaint)**
-Tight bullet points or abbreviated sentences:
-- Onset: [when it started]
-- Character: [what it feels like]
-- Severity: [scale or description]
-- Timing: [frequency, pattern]
-- Exacerbating/relieving: [what makes it better/worse]
-- Associated symptoms: [other symptoms]
-- Impact: [effect on daily life]
-
-**ICE**
-- Ideas: [what pt thinks]
-- Concerns: [what worries them]
-- Expectations: [what they want]
-
-**PMHx**
-List format: HTN, T2DM, etc. Include surgeries if any.
-
-**Medications**
-List with doses if given. Note allergies.
-
-**FHx**
-Brief. List relevant conditions + age at onset/death if mentioned.
-
-**SHx**
-Smoking: [pack-years or never]
-Alcohol: [units/week]
-Occupation: [job]
-Living situation: [brief]
-
-**RFs (Red Flags / Relevant Negatives)**
-What patient explicitly denied or concerning symptoms mentioned.
-
-USE ABBREVIATIONS: HPC, PMHx, FHx, SHx, BP, DM, IHD, GORD, etc.
-USE SHORTHAND: 3/7 (3 days), 2/52 (2 weeks), 6/12 (6 months)
-BE CONCISE: "No CP, SOB, or syncope" not "The patient denies experiencing chest pain, shortness of breath, or syncopal episodes"
-
-This is CLINICAL DOCUMENTATION, not a story. Document ONLY what was explicitly stated."""
+Write as you would in real clinical practice - concise, factual, no waffle."""
         
         try:
             from openai import AzureOpenAI
