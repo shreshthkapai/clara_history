@@ -11,13 +11,10 @@ def initialize_chat_session():
         st.session_state.messages = []
     
     if 'tts_enabled' not in st.session_state:
-        st.session_state.tts_enabled = True  # Always start with voice ON
+        st.session_state.tts_enabled = True
     
     if 'conversation_started' not in st.session_state:
         st.session_state.conversation_started = False
-    
-    if 'awaiting_red_flag_response' not in st.session_state:
-        st.session_state.awaiting_red_flag_response = False
     
     if 'conversation_ended' not in st.session_state:
         st.session_state.conversation_ended = False
@@ -31,7 +28,7 @@ def render_chat_header():
     with st.sidebar:
         st.header("Settings")
         
-        # TTS toggle - MORE PROMINENT
+        # TTS toggle
         st.session_state.tts_enabled = st.toggle(
             "🔊 Clara's Voice",
             value=st.session_state.tts_enabled,
@@ -60,10 +57,10 @@ def display_chat_history():
         with st.chat_message(role):
             st.write(content)
             
-            # Only auto-play if TTS is CURRENTLY enabled (respect the toggle)
+            # Only auto-play if TTS is CURRENTLY enabled
             is_latest_clara = (role == "assistant" and i == len(st.session_state.messages) - 1)
             
-            if role == "assistant" and "audio" in message and message["audio"] and st.session_state.tts_enabled:  # ← ADD CHECK HERE
+            if role == "assistant" and "audio" in message and message["audio"] and st.session_state.tts_enabled:
                 import base64
                 audio_base64 = base64.b64encode(message["audio"]).decode()
                 
@@ -83,8 +80,9 @@ def display_chat_history():
                     # Older messages - show playable audio (but don't autoplay)
                     st.audio(message["audio"], format="audio/wav")
 
-def add_message(role: str, content: str, audio: Optional[bytes] = None):
 
+def add_message(role: str, content: str, audio: Optional[bytes] = None):
+    """Add message to chat history"""
     message = {
         "role": role,
         "content": content
@@ -97,6 +95,7 @@ def add_message(role: str, content: str, audio: Optional[bytes] = None):
 
 
 def get_clara_response_with_audio(text: str, speech_service: AzureSpeechService) -> Tuple[str, Optional[bytes]]:
+    """Generate Clara's audio response if TTS enabled"""
     audio_bytes = None
     
     if st.session_state.tts_enabled:
@@ -106,9 +105,7 @@ def get_clara_response_with_audio(text: str, speech_service: AzureSpeechService)
 
 
 def render_patient_input(speech_service: AzureSpeechService) -> Optional[str]:
-    """
-    Render input area for patient (text + microphone)
-    """
+    """Render input area for patient (text + microphone)"""
     
     # Don't show input if conversation ended
     if st.session_state.conversation_ended:
@@ -123,7 +120,7 @@ def render_patient_input(speech_service: AzureSpeechService) -> Optional[str]:
     if text_input:
         return text_input
     
-    # Microphone in sidebar - SIMPLE APPROACH
+    # Microphone in sidebar
     with st.sidebar:
         st.divider()
         st.subheader("🎤 Voice Input")
@@ -150,8 +147,9 @@ def render_patient_input(speech_service: AzureSpeechService) -> Optional[str]:
     
     return None
 
-def show_conversation_ended_message():
 
+def show_conversation_ended_message():
+    """Show message when conversation ends"""
     st.success("✅ **Conversation Complete**")
     st.info("""
     Thank you for completing the pre-consultation questions!
@@ -162,11 +160,8 @@ def show_conversation_ended_message():
     """)
 
 
-def show_red_flag_warning():
-    st.warning("⚠️ **IMPORTANT HEALTH INFORMATION ABOVE** - Please read Clara's message carefully.")
-
-
 def render_progress_indicator(clara_agent):
+    """Render progress indicator in sidebar"""
     with st.sidebar:
         st.divider()
         st.subheader("Progress")
@@ -178,18 +173,18 @@ def render_progress_indicator(clara_agent):
         
         topics_progress = progress['required_topics_completed'] / progress['required_topics_total']
         st.progress(topics_progress, text=f"Topics: {progress['required_topics_completed']}/{progress['required_topics_total']}")
-        
-        if progress['red_flags_detected'] > 0:
-            st.error(f"🚨 Red flags detected: {progress['red_flags_detected']}")
 
 
 def render_chat_interface(clara_agent, speech_service: AzureSpeechService):
-   
+    """Main chat interface renderer"""
+    
     initialize_chat_session()
 
     render_chat_header()
     
+    # Start conversation
     if not st.session_state.conversation_started:
+        # Get opening message (includes emergency warning + first question)
         opening_message = clara_agent.start_conversation()
         
         audio_bytes = None
@@ -216,20 +211,8 @@ def render_chat_interface(clara_agent, speech_service: AzureSpeechService):
         
         with st.spinner("Clara is thinking..."):
             
-            # Check if we're waiting for red flag response
-            if st.session_state.awaiting_red_flag_response:
-                clara_response, should_end, end_reason = clara_agent.handle_red_flag_response(user_input)
-                st.session_state.awaiting_red_flag_response = False
-            else:
-                # Normal response processing
-                clara_response, should_end, end_reason = clara_agent.process_patient_response(user_input)
-                
-                # Check if this triggered a red flag
-                if clara_agent.state.red_flags_detected and not should_end:
-                    last_red_flag = clara_agent.state.red_flags_detected[-1]
-                    if last_red_flag.action_taken == "awaiting_response":
-                        st.session_state.awaiting_red_flag_response = True
-                        show_red_flag_warning()
+            # Process response
+            clara_response, should_end, end_reason = clara_agent.process_patient_response(user_input)
             
             # Generate audio if enabled
             audio_bytes = None

@@ -52,7 +52,6 @@ class AzureOpenAIService:
         Smart LLM call - returns structured JSON decision
         
         Handles:
-        - Red flag detection
         - Next question generation
         - Topic completion
         - Conversation end detection
@@ -94,8 +93,6 @@ class AzureOpenAIService:
             
             # Emergency fallback
             return {
-                "red_flag_detected": False,
-                "red_flag_category": None,
                 "conversation_complete": False,
                 "topics_completed": [],
                 "optional_topics_to_skip": [],
@@ -109,8 +106,6 @@ class AzureOpenAIService:
         Extracts key information from malformed response
         """
         decision = {
-            "red_flag_detected": False,
-            "red_flag_category": None,
             "conversation_complete": False,
             "topics_completed": [],
             "optional_topics_to_skip": [],
@@ -133,10 +128,6 @@ class AzureOpenAIService:
             if "?" in text:
                 decision["next_question"] = text
         
-        # Check for red flag indicators
-        if "red_flag" in text.lower() and "true" in text.lower():
-            decision["red_flag_detected"] = True
-        
         return decision
 
     def _validate_decision(self, decision: Dict) -> Dict:
@@ -144,8 +135,6 @@ class AzureOpenAIService:
         Validate decision has all required fields with correct types
         """
         defaults = {
-            "red_flag_detected": False,
-            "red_flag_category": None,
             "conversation_complete": False,
             "topics_completed": [],
             "optional_topics_to_skip": [],
@@ -159,9 +148,6 @@ class AzureOpenAIService:
                 decision[key] = default_value
         
         # Type validation
-        if not isinstance(decision["red_flag_detected"], bool):
-            decision["red_flag_detected"] = False
-        
         if not isinstance(decision["conversation_complete"], bool):
             decision["conversation_complete"] = False
         
@@ -177,7 +163,7 @@ class AzureOpenAIService:
         return decision
 
     # ==========================================
-    # LEGACY METHODS - Keep for summaries
+    # SUMMARY GENERATION METHODS
     # ==========================================
         
     def generate_summary(
@@ -207,7 +193,6 @@ class AzureOpenAIService:
                                 - Current Medications: List medications mentioned
                                 - Relevant Medical History: Previous conditions, surgeries, similar issues
                                 - Ideas, Concerns, Expectations (ICE): What patient thinks/worries/hopes
-                                - Red Flags: Any concerning symptoms mentioned or explicitly denied
                                 - Social Context: Brief relevant lifestyle factors
                                 Be thorough but concise. Use clinical language."""
         

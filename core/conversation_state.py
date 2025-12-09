@@ -11,12 +11,6 @@ class Message(BaseModel):
     topic: Optional[str] = None  
     flags: List[str] = Field(default_factory=list)
 
-class RedFlagEvent(BaseModel):
-    category: str  
-    severity: str  
-    triggered_at: datetime = Field(default_factory=datetime.now)
-    patient_response: Optional[str] = None  
-    action_taken: str  
 
 class ConversationState(BaseModel):
     conversation_id: str
@@ -36,10 +30,7 @@ class ConversationState(BaseModel):
     topics_optional: List[str] = Field(default_factory=list)
     
     question_count: int = 0
-    max_questions: int = 20
-    
-    red_flags_detected: List[RedFlagEvent] = Field(default_factory=list)
-    conversation_ended_for_emergency: bool = False
+    max_questions: int = 30
     
     checklist_template: Dict[str, Any] = Field(default_factory=dict)
 
@@ -49,6 +40,7 @@ class ConversationState(BaseModel):
             self._initialize_checklist()
     
     def _initialize_checklist(self):
+        """Initialize checklist from template"""
         template_checklist = self.checklist_template.get('checklist', {})
         self.checklist = {k: v.copy() for k, v in template_checklist.items()}
         
@@ -59,9 +51,10 @@ class ConversationState(BaseModel):
                 self.topics_optional.append(topic)
         
         rules = self.checklist_template.get('conversation_rules', {})
-        self.max_questions = rules.get('max_questions', 20)
+        self.max_questions = rules.get('max_questions', 30)
 
     def add_message(self, speaker: str, text: str, topic: Optional[str] = None, flags: Optional[List[str]] = None):
+        """Add message to conversation"""
         message = Message(
             speaker=speaker,
             text=text,
@@ -74,21 +67,25 @@ class ConversationState(BaseModel):
             self.question_count += 1
     
     def mark_topic_complete(self, topic: str):
+        """Mark a topic as completed"""
         if topic in self.checklist:
             self.checklist[topic]['completed'] = True
             if topic not in self.topics_completed:
                 self.topics_completed.append(topic)
     
     def is_topic_complete(self, topic: str) -> bool:
+        """Check if topic is completed"""
         return self.checklist.get(topic, {}).get('completed', False)
     
     def get_incomplete_required_topics(self) -> List[str]:
+        """Get list of incomplete required topics"""
         return [
             topic for topic in self.topics_required 
             if not self.is_topic_complete(topic)
         ]
     
     def get_next_priority_topic(self) -> Optional[str]:
+        """Get next topic to ask about based on priority"""
         incomplete = self.get_incomplete_required_topics()
         
         if not incomplete:
@@ -108,29 +105,11 @@ class ConversationState(BaseModel):
         
         return incomplete_with_priority[0][0]
 
-    def record_red_flag(self, category: str, severity: str, patient_response: Optional[str] = None, action_taken: str = "continued_with_warning"):
-        event = RedFlagEvent(
-            category=category,
-            severity=severity,
-            patient_response=patient_response,
-            action_taken=action_taken
-        )
-        self.red_flags_detected.append(event)
-        
-        if action_taken == "ended_conversation":
-            self.conversation_ended_for_emergency = True
-            self.status = "ended_early_emergency"
-            self.ended_at = datetime.now()
-    
     def should_end_conversation(self) -> tuple[bool, str]:
         """
         Determine if conversation should end
         Returns: (should_end, reason)
         """
-        
-        # Already ended for emergency
-        if self.conversation_ended_for_emergency:
-            return (True, "emergency")
         
         # Hit question limit - hard stop
         if self.question_count >= self.max_questions:
@@ -148,6 +127,7 @@ class ConversationState(BaseModel):
         return (False, "continue")
     
     def get_progress_summary(self) -> Dict[str, Any]:
+        """Get conversation progress summary"""
         return {
             "questions_asked": self.question_count,
             "max_questions": self.max_questions,
@@ -155,16 +135,16 @@ class ConversationState(BaseModel):
             "required_topics_total": len(self.topics_required),
             "optional_topics_completed": len([t for t in self.topics_optional if self.is_topic_complete(t)]),
             "optional_topics_total": len(self.topics_optional),
-            "red_flags_detected": len(self.red_flags_detected),
             "status": self.status
         }
     
-    
     def end_conversation(self, status: str = "completed"):
+        """End the conversation"""
         self.status = status
         self.ended_at = datetime.now()
     
     def get_transcript(self) -> List[Dict[str, Any]]:
+        """Get full transcript as list of dicts"""
         return [
             {
                 "speaker": msg.speaker,
@@ -177,6 +157,7 @@ class ConversationState(BaseModel):
         ]
     
     def save_to_file(self, filepath: Path):
+        """Save conversation to JSON file"""
         data = {
             "conversation_id": self.conversation_id,
             "patient_name": self.patient_name,
@@ -188,16 +169,6 @@ class ConversationState(BaseModel):
             "question_count": self.question_count,
             "transcript": self.get_transcript(),
             "topics_completed": self.topics_completed,
-            "red_flags_detected": [
-                {
-                    "category": flag.category,
-                    "severity": flag.severity,
-                    "triggered_at": flag.triggered_at.isoformat(),
-                    "patient_response": flag.patient_response,
-                    "action_taken": flag.action_taken
-                }
-                for flag in self.red_flags_detected
-            ],
             "progress": self.get_progress_summary()
         }
         
@@ -206,41 +177,10 @@ class ConversationState(BaseModel):
     
     @classmethod
     def load_from_template(cls, conversation_id: str, patient_name: str, doctor_name: str):
-        
+        """Load conversation state from template"""
         template_path = Path("data/checklist_template.json")
         
-        with open(template_path, 'r') as f:
-            template = json.load(f)
-        
-        return cls(
-            conversation_id=conversation_id,
-            patient_name=patient_name,
-            doctor_name=doctor_name,
-            checklist_template=template
-        )
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2)
-    
-    @classmethod
-    def load_from_template(cls, conversation_id: str, patient_name: str, doctor_name: str):
-        
-        template_path = Path("data/checklist_template.json")
-        
-        with open(template_path, 'r') as f:
-            template = json.load(f)
-        
-        return cls(
-            conversation_id=conversation_id,
-            patient_name=patient_name,
-            doctor_name=doctor_name,
-            checklist_template=template
-        )
-    @classmethod
-    def load_from_template(cls, conversation_id: str, patient_name: str, doctor_name: str):
-        
-        template_path = Path("data/checklist_template.json")
-        
-        with open(template_path, 'r') as f:
+        with open(template_path, 'r', encoding='utf-8') as f:
             template = json.load(f)
         
         return cls(

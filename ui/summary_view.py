@@ -30,11 +30,6 @@ def render_summary_view(outputs: Dict[str, Any]):
     
     st.divider()
     
-    # Safety banner if red flags present
-    red_flags = outputs.get('red_flags', [])
-    if red_flags:
-        render_red_flag_banner(red_flags)
-    
     # Main content - 2 column layout
     col_left, col_right = st.columns([2, 1])
     
@@ -57,26 +52,6 @@ def render_summary_view(outputs: Dict[str, Any]):
         
         # Conversation Stats
         render_conversation_stats(outputs.get('conversation_stats', {}))
-
-
-def render_red_flag_banner(red_flags):
-    """Display warning banner for red flags"""
-    st.error("🚨 **URGENT: Red Flag Detected**")
-    
-    for flag in red_flags:
-        category = flag.get('category', 'Unknown')
-        severity = flag.get('severity', 'Unknown')
-        action = flag.get('action_taken', 'Unknown')
-        
-        st.warning(f"""
-        **Category:** {category.replace('_', ' ').title()}  
-        **Severity:** {severity.upper()}  
-        **Action:** {action.replace('_', ' ').title()}  
-        
-        ⚠️ Patient was advised to seek emergency care during pre-consultation.
-        """)
-    
-    st.divider()
 
 
 def render_short_summary(short_summary: str):
